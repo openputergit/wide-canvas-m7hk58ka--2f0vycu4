@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jeans Manufacturing Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        .loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="loading">
+        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+    </div>
+
+    <nav class="bg-blue-600 p-4">
+        <div class="container mx-auto">
+            <h1 class="text-white text-2xl font-bold">Jeans Manufacturing Management</h1>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-4">
+        <div class="mb-4">
+            <button onclick="showFabricForm()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                <i class="bi bi-plus-lg"></i> Add New Fabric Roll
+            </button>
+            <button onclick="toggleView('fabricator')" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 ml-2">
+                <i class="bi bi-people-fill"></i> Fabricator View
+            </button>
+        </div>
+
+        <!-- Fabric Form -->
+        <div id="fabricForm" class="hidden bg-white p-4 rounded shadow-md mb-4">
+            <h2 class="text-xl font-bold mb-4">Add New Fabric Roll</h2>
+            <form onsubmit="handleFabricSubmit(event)" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="date" id="purchaseDate" required class="border p-2 rounded" />
+                    <input type="text" id="fabricName" placeholder="Fabric Name" required class="border p-2 rounded" />
+                    <input type="number" id="quantity" placeholder="Quantity of Rolls" required class="border p-2 rounded" />
+                    <input type="number" id="cost" placeholder="Cost per Roll (₹)" required class="border p-2 rounded" />
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" onclick="showFabricForm()" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Cancel</button>
+                    <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Save</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Fabric Table -->
+        <div id="fabricView" class="bg-white rounded shadow-md overflow-x-auto">
+            <table class="min-w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fabric Name</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cost (₹)</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="fabricTableBody" class="bg-white divide-y divide-gray-200"></tbody>
+            </table>
+        </div>
+
+        <!-- Fabricator View -->
+        <div id="fabricatorView" class="hidden">
+            <div class="bg-white p-4 rounded shadow-md mb-4">
+                <h2 class="text-xl font-bold mb-4">Assign Fabric to Fabricator</h2>
+                <form onsubmit="handleFabricatorSubmit(event)" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <select id="fabricRoll" required class="border p-2 rounded"></select>
+                        <input type="text" id="fabricatorName" placeholder="Fabricator Name" required class="border p-2 rounded" />
+                        <input type="date" id="assignDate" required class="border p-2 rounded" />
+                        <input type="number" id="piecesMade" placeholder="Number of Pieces" required class="border p-2 rounded" />
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Assign</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="bg-white rounded shadow-md overflow-x-auto">
+                <table class="min-w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fabric Roll</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fabricator</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Date</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pieces Made</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fabricatorTableBody" class="bg-white divide-y divide-gray-200"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Generate a persistent userId if not exists
+        if (!localStorage.getItem('userId')) {
+            localStorage.setItem('userId', 'user_' + Math.random().toString(36).substr(2, 9));
+        }
+        const userId = localStorage.getItem('userId');
+        const appSlug = 'jeans-manufacturing-app';
+
+        let loading = false;
+
+        function showLoading() {
+            document.querySelector('.loading').style.display = 'block';
+            loading = true;
+        }
+
+        function hideLoading() {
+            document.querySelector('.loading').style.display = 'none';
+            loading = false;
+        }
+
+        function showFabricForm() {
+            const form = document.getElementById('fabricForm');
+            form.classList.toggle('hidden');
+        }
+
+        function toggleView(view) {
+            document.getElementById('fabricView').classList.toggle('hidden', view === 'fabricator');
+            document.getElementById('fabricatorView').classList.toggle('hidden', view === 'fabric');
+            if (view === 'fabricator') {
+                loadFabricOptions();
+            }
+        }
+
+        async function handleFabricSubmit(event) {
+            event.preventDefault();
+            if (loading) return;
+
+            const fabricData = {
+                purchaseDate: document.getElementById('purchaseDate').value,
+                fabricName: document.getElementById('fabricName').value,
+                quantity: document.getElementById('quantity').value,
+                cost: document.getElementById('cost').value
+            };
+
+            showLoading();
+            try {
+                await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/db', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer XWYcFYdP4zc9KUzQfmGd5nDY30F3',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userId,
+                        appSlug,
+                        action: 'create',
+                        table: 'fabric_rolls',
+                        data: fabricData
+                    })
+                });
+
+                event.target.reset();
+                showFabricForm();
+                loadFabricRolls();
+            } catch (error) {
+                console.error('Error:', error);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function loadFabricRolls() {
+            if (loading) return;
+            showLoading();
+
+            try {
+                const response = await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/db', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer XWYcFYdP4zc9KUzQfmGd5nDY30F3',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userId,
+                        appSlug,
+                        action: 'read',
+                        table: 'fabric_rolls'
+                    })
+                });
+
+                const result = await response.json();
+                const tableBody = document.getElementById('fabricTableBody');
+                tableBody.innerHTML = '';
+
+                result.data.forEach(roll => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap">${new Date(roll.data.purchaseDate).toLocaleDateString()}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${roll.data.fabricName}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${roll.data.quantity}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">₹${roll.data.cost}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <button onclick="deleteFabricRoll('${roll.id}')" class="text-red-600 hover:text-red-900">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Error:', error);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function loadFabricOptions() {
+            if (loading) return;
+            showLoading();
+
+            try {
+                const response = await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/db', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer XWYcFYdP4zc9KUzQfmGd5nDY30F3',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userId,
+                        appSlug,
+                        action: 'read',
+                        table: 'fabric_rolls'
+                    })
+                });
+
+                const result = await response.json();
+                const select = document.getElementById('fabricRoll');
+                select.innerHTML = '';
+
+                result.data.forEach(roll => {
+                    const option = document.createElement('option');
+                    option.value = roll.id;
+                    option.textContent = `${roll.data.fabricName} (${roll.data.quantity} rolls)`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error:', error);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function handleFabricatorSubmit(event) {
+            event.preventDefault();
+            if (loading) return;
+
+            const fabricatorData = {
+                fabricRollId: document.getElementById('fabricRoll').value,
+                fabricatorName: document.getElementById('fabricatorName').value,
+                assignDate: document.getElementById('assignDate').value,
+                piecesMade: document.getElementById('piecesMade').value
+            };
+
+            showLoading();
+            try {
+                await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/db', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer XWYcFYdP4zc9KUzQfmGd5nDY30F3',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userId,
+                        appSlug,
+                        action: 'create',
+                        table: 'fabricator_assignments',
+                        data: fabricatorData
+                    })
+                });
+
+                event.target.reset();
+                loadFabricatorAssignments();
+            } catch (error) {
+                console.error('Error:', error);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function loadFabricatorAssignments() {
+            if (loading) return;
+            showLoading();
+
+            try {
+                const response = await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/db', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer XWYcFYdP4zc9KUzQfmGd5nDY30F3',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userId,
+                        appSlug,
+                        action: 'read',
+                        table: 'fabricator_assignments'
+                    })
+                });
+
+                const result = await response.json();
+                const tableBody = document.getElementById('fabricatorTableBody');
+                tableBody.innerHTML = '';
+
+                result.data.forEach(assignment => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap">${assignment.data.fabricRollId}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${assignment.data.fabricatorName}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${new Date(assignment.data.assignDate).toLocaleDateString()}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">${assignment.data.piecesMade}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Error:', error);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function deleteFabricRoll(id) {
+            if (!confirm('Are you sure you want to delete this fabric roll?') || loading) return;
+            
+            showLoading();
+            try {
+                await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/db', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer XWYcFYdP4zc9KUzQfmGd5nDY30F3',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userId,
+                        appSlug,
+                        action: 'delete',
+                        table: 'fabric_rolls',
+                        id
+                    })
+                });
+
+                loadFabricRolls();
+            } catch (error) {
+                console.error('Error:', error);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Initial load
+        loadFabricRolls();
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
